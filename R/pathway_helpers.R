@@ -1,7 +1,3 @@
-suppressPackageStartupMessages({
-  library(AnnotationDbi)
-})
-
 `%||%` <- function(x, y) {
   if (is.null(x)) {
     y
@@ -64,6 +60,7 @@ canonical_species_name <- function(species) {
     "human" = "Homo sapiens",
     "homo sapiens" = "Homo sapiens",
     "mouse" = "Mus musculus",
+    "mosue" = "Mus musculus",
     "mus musculus" = "Mus musculus",
     "rat" = "Rattus norvegicus",
     "rattus norvegicus" = "Rattus norvegicus",
@@ -83,9 +80,157 @@ is_rat_species <- function(species) {
   canonical_species_name(species) == "Rattus norvegicus"
 }
 
+species_build_defaults <- function(species) {
+  canonical <- canonical_species_name(species)
+
+  switch(
+    canonical,
+    "Homo sapiens" = list(
+      species = canonical,
+      org_db_package = "org.Hs.eg.db",
+      msigdb_db_species = "HS",
+      kegg_organism = "hsa",
+      progeny_organism = "human",
+      collectri_organism = "human",
+      skip = character(0)
+    ),
+    "Mus musculus" = list(
+      species = canonical,
+      org_db_package = "org.Mm.eg.db",
+      msigdb_db_species = "MM",
+      kegg_organism = "mmu",
+      progeny_organism = "mouse",
+      collectri_organism = "mouse",
+      skip = character(0)
+    ),
+    "Rattus norvegicus" = list(
+      species = canonical,
+      org_db_package = "org.Rn.eg.db",
+      msigdb_db_species = "HS",
+      kegg_organism = "rno",
+      progeny_organism = NULL,
+      collectri_organism = "rat",
+      skip = "progeny"
+    ),
+    stop(
+      sprintf(
+        "Unsupported species '%s'. Use one of: 'human', 'mouse', or 'rat'.",
+        species
+      ),
+      call. = FALSE
+    )
+  )
+}
+
+load_org_db_from_package <- function(package_name, species = NULL) {
+  if (!requireNamespace(package_name, quietly = TRUE)) {
+    install_hint <- if (is.null(species)) {
+      sprintf("Install %s before running this step.", package_name)
+    } else {
+      sprintf(
+        "Install %s to build pathway libraries for species = '%s'.",
+        package_name,
+        species
+      )
+    }
+    stop(install_hint, call. = FALSE)
+  }
+
+  getExportedValue(package_name, package_name)
+}
+
+validate_org_db_matches_species <- function(org_db, species) {
+  org_species <- organism_name_from_orgdb(org_db)
+  canonical <- canonical_species_name(species)
+
+  if (identical(org_species, "unknown")) {
+    return(invisible(org_db))
+  }
+
+  if (!identical(org_species, canonical)) {
+    stop(
+      sprintf(
+        "species = '%s' resolves to '%s', but the supplied org_db is built for '%s'.",
+        species,
+        canonical,
+        org_species
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(org_db)
+}
+
+resolve_species_org_db <- function(species, org_db = NULL) {
+  defaults <- species_build_defaults(species)
+
+  resolved <- if (is.null(org_db)) {
+    load_org_db_from_package(defaults$org_db_package, species = defaults$species)
+  } else if (is.character(org_db)) {
+    if (length(org_db) != 1L || is.na(org_db) || !nzchar(trimws(org_db))) {
+      stop("org_db must be NULL, an OrgDb object, or a single package name.", call. = FALSE)
+    }
+    load_org_db_from_package(trimws(org_db), species = defaults$species)
+  } else {
+    org_db
+  }
+
+  validate_org_db_matches_species(resolved, defaults$species)
+  resolved
+}
+
+resolve_species_build_context <- function(species, org_db = NULL, skip = character(0)) {
+  defaults <- species_build_defaults(species)
+  auto_skip <- setdiff(defaults$skip, skip)
+
+  if (length(auto_skip) && identical(defaults$species, "Rattus norvegicus")) {
+    message("Rat builds omit PROGENy because this pipeline does not ship a rat PROGENy model.")
+  }
+
+  defaults$org_db <- resolve_species_org_db(defaults$species, org_db = org_db)
+  defaults$skip <- unique(c(skip, defaults$skip))
+  defaults
+}
+
+reject_database_species_overrides <- function(extra_args, fun_name) {
+  if (!length(extra_args)) {
+    return(invisible(NULL))
+  }
+
+  arg_names <- names(extra_args)
+  if (is.null(arg_names) || any(!nzchar(arg_names))) {
+    stop(sprintf("%s() received unexpected unnamed extra arguments.", fun_name), call. = FALSE)
+  }
+
+  retired_args <- intersect(
+    arg_names,
+    c("msigdb_db_species", "kegg_organism", "progeny_organism", "collectri_organism")
+  )
+  if (length(retired_args)) {
+    stop(
+      sprintf(
+        paste0(
+          "%s() no longer accepts per-database species overrides (%s). ",
+          "Use species = 'human', 'mouse', or 'rat'. ",
+          "If you need lower-level control, call the specific download_* function directly."
+        ),
+        fun_name,
+        paste(retired_args, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  stop(
+    sprintf("%s() got unexpected arguments: %s", fun_name, paste(arg_names, collapse = ", ")),
+    call. = FALSE
+  )
+}
+
 safe_package_version <- function(package_name) {
   tryCatch(
-    as.character(packageVersion(package_name)),
+    as.character(utils::packageVersion(package_name)),
     error = function(e) "not installed"
   )
 }
@@ -170,12 +315,14 @@ map_symbols_to_entrez <- function(
 
   for (keytype in keytypes) {
     attempted <- tryCatch(
-      AnnotationDbi::mapIds(
-        org_db,
-        keys = symbols,
-        keytype = keytype,
-        column = "ENTREZID",
-        multiVals = multiVals
+      suppressMessages(
+        AnnotationDbi::mapIds(
+          org_db,
+          keys = symbols,
+          keytype = keytype,
+          column = "ENTREZID",
+          multiVals = multiVals
+        )
       ),
       error = function(e) NULL
     )

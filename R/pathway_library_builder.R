@@ -5,7 +5,7 @@ collect_versions <- function(org_db) {
   versions$platform <- R.version$platform
 
   versions$GO.db <- tryCatch({
-    meta <- AnnotationDbi::metadata(GO.db)
+    meta <- AnnotationDbi::metadata(GO.db::GO.db)
     list(
       package_version = safe_package_version("GO.db"),
       source_date = meta$value[meta$name == "GOSOURCEDATE"],
@@ -100,7 +100,9 @@ write_readme <- function(versions, params, file_inventory, output_dir) {
   add("```")
   for (param_name in names(params)) {
     value <- params[[param_name]]
-    if (is.character(value) && length(value) > 1L) {
+    if (is.null(value) || !length(value)) {
+      value <- "not used"
+    } else if (is.character(value) && length(value) > 1L) {
       value <- paste(value, collapse = ", ")
     }
     add(param_name, " = ", value)
@@ -130,7 +132,7 @@ write_readme <- function(versions, params, file_inventory, output_dir) {
   add("")
   add("```r")
   add('library(clusterProfiler)')
-  add('source("R/load_project_code.R")')
+  add('library(customizeGeneSets)')
   add("")
   add('gmt <- read.gmt("path/to/file.gmt")')
   add('gmt_names <- read_gmt_term2name("path/to/file.gmt")')
@@ -151,94 +153,9 @@ write_readme <- function(versions, params, file_inventory, output_dir) {
   readme_path
 }
 
-harmonize_species_build_config <- function(
-    species,
-    kegg_organism,
-    progeny_organism,
-    collectri_organism,
-    skip
-) {
-  species <- canonical_species_name(species)
-  progeny_organism <- tolower(trimws(progeny_organism))
-  collectri_organism <- tolower(trimws(collectri_organism))
-  skip <- unique(skip)
-
-  if (is_mouse_species(species)) {
-    if (kegg_organism != "mmu") {
-      warning(
-        sprintf("Mouse build requested: using kegg_organism = 'mmu' instead of '%s'.", kegg_organism),
-        call. = FALSE
-      )
-      kegg_organism <- "mmu"
-    }
-    if (progeny_organism != "mouse") {
-      warning(
-        sprintf("Mouse build requested: using progeny_organism = 'mouse' instead of '%s'.", progeny_organism),
-        call. = FALSE
-      )
-      progeny_organism <- "mouse"
-    }
-    if (collectri_organism != "mouse") {
-      warning(
-        sprintf("Mouse build requested: using collectri_organism = 'mouse' instead of '%s'.", collectri_organism),
-        call. = FALSE
-      )
-      collectri_organism <- "mouse"
-    }
-  }
-
-  if (is_rat_species(species)) {
-    if (kegg_organism != "rno") {
-      warning(
-        sprintf("Rat build requested: using kegg_organism = 'rno' instead of '%s'.", kegg_organism),
-        call. = FALSE
-      )
-      kegg_organism <- "rno"
-    }
-    if (collectri_organism != "rat") {
-      warning(
-        sprintf("Rat build requested: using collectri_organism = 'rat' instead of '%s'.", collectri_organism),
-        call. = FALSE
-      )
-      collectri_organism <- "rat"
-    }
-    if (!("progeny" %in% skip)) {
-      warning(
-        "Rat build requested: PROGENy is not supported for rat in this pipeline, so the PROGENy step will be skipped.",
-        call. = FALSE
-      )
-      skip <- unique(c(skip, "progeny"))
-    }
-    if (!("collectri" %in% skip)) {
-      warning(
-        paste(
-          "Rat build requested: CollecTRI still depends on a fragile OmniPath/Ensembl path.",
-          "The pipeline will try a rat-specific OmnipathR fallback, but this step may still fail depending on network access or cached static data."
-        ),
-        call. = FALSE
-      )
-    }
-  }
-
-  if (!("progeny" %in% skip) && !(progeny_organism %in% c("human", "mouse"))) {
-    stop("progeny_organism must be 'human' or 'mouse'; rat builds should skip PROGENy.", call. = FALSE)
-  }
-
-  list(
-    species = species,
-    kegg_organism = kegg_organism,
-    progeny_organism = progeny_organism,
-    collectri_organism = collectri_organism,
-    skip = skip
-  )
-}
-
 build_pathway_library <- function(
-    org_db,
-    species = "Homo sapiens",
-    msigdb_db_species = NULL,
-    kegg_organism = "hsa",
-    progeny_organism = "human",
+    org_db = NULL,
+    species = "human",
     include_IEA = TRUE,
     pos_keywords = NULL,
     neg_keywords = NULL,
@@ -250,14 +167,16 @@ build_pathway_library <- function(
     msigdb_collections = c("H", "C2"),
     msigdb_subcollections = NULL,
     progeny_top_n = 100,
-    collectri_organism = "human",
     collectri_min_targets = 10,
     collectri_max_targets = 500,
     skip = character(0),
     go_script = "build_go_regulation_gmt.R",
     pathway_script = "download_pathway_gmt.R",
-    output_dir = "pathway_library"
+    output_dir = "pathway_library",
+    ...
 ) {
+  reject_database_species_overrides(list(...), fun_name = "build_pathway_library")
+
   if (!exists("build_go_regulation_library", mode = "function") && file.exists(go_script)) {
     source(go_script, local = FALSE)
   }
@@ -282,19 +201,18 @@ build_pathway_library <- function(
     neg_keywords <- DEFAULT_NEG_KEYWORDS
   }
 
-  harmonized <- harmonize_species_build_config(
+  harmonized <- resolve_species_build_context(
     species = species,
-    kegg_organism = kegg_organism,
-    progeny_organism = progeny_organism,
-    collectri_organism = collectri_organism,
+    org_db = org_db,
     skip = skip
   )
+  org_db <- harmonized$org_db
   species <- harmonized$species
+  msigdb_db_species <- harmonized$msigdb_db_species
   kegg_organism <- harmonized$kegg_organism
   progeny_organism <- harmonized$progeny_organism
   collectri_organism <- harmonized$collectri_organism
   skip <- harmonized$skip
-  msigdb_db_species <- resolve_msigdb_db_species(species, db_species = msigdb_db_species)
 
   dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
   file_inventory <- list()

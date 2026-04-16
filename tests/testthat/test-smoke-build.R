@@ -7,12 +7,9 @@ test_that("offline build smoke test completes", {
   skip_if_not_installed("reactome.db")
   skip_if_not_installed("progeny")
 
-  library(org.Hs.eg.db)
-
   out_dir <- tempfile("pathway_smoke_")
   result <- build_pathway_library(
-    org_db = org.Hs.eg.db,
-    species = "Homo sapiens",
+    species = "human",
     msigdb_collections = c("H"),
     skip = c("kegg", "collectri"),
     output_dir = out_dir

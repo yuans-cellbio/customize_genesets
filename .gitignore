@@ -9,6 +9,11 @@ Thumbs.db
 .RData
 .Rproj.user/
 *.Rproj
+*.Rcheck/
+*.tar.gz
+/.package-library/
+/.pkg-library/
+/.tmp-lib/
 
 # Python
 __pycache__/
@@ -19,3 +24,4 @@ __pycache__/
 # Data outputs (adjust)
 *.log
 *.tmp
+omnipathr-log/

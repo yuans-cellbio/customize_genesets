@@ -19,9 +19,8 @@ resolve_msigdb_db_species <- function(species, db_species = NULL) {
   }
 
   if (is_rat_species(species)) {
-    warning(
-      "Rat builds use human MSigDB (db_species = 'HS') with ortholog mapping because msigdbr does not provide a rat-native MSigDB database.",
-      call. = FALSE
+    message(
+      "Rat builds use ortholog-mapped human MSigDB with db_species = 'HS' because msigdbr does not provide a rat-native database."
     )
     return("HS")
   }
@@ -290,7 +289,7 @@ download_progeny_gmt <- function(
   model_top <- do.call(rbind, lapply(split(model, model$pathway), function(pathway_df) {
     rownames(pathway_df) <- NULL
     pathway_df <- pathway_df[order(pathway_df$p.value), , drop = FALSE]
-    head(pathway_df, top_n)
+    utils::head(pathway_df, top_n)
   }))
   rownames(model_top) <- NULL
   model_top$gene <- as.character(model_top$gene)
@@ -304,7 +303,7 @@ download_progeny_gmt <- function(
 
   symbols <- unique(model_top$gene)
   message(sprintf("  Converting %d unique gene symbols to Entrez IDs...", length(symbols)))
-  message(sprintf("  Example symbols: %s", paste(head(symbols, 10), collapse = ", ")))
+  message(sprintf("  Example symbols: %s", paste(utils::head(symbols, 10), collapse = ", ")))
 
   symbol_to_entrez <- map_symbols_to_entrez(org_db, symbols)
   n_mapped <- sum(!is.na(symbol_to_entrez))
@@ -315,9 +314,9 @@ download_progeny_gmt <- function(
 
   for (pathway in unique(model_top$pathway)) {
     pathway_df <- model_top[model_top$pathway == pathway, , drop = FALSE]
-    pos_entrez <- unique(na.omit(symbol_to_entrez[as.character(pathway_df$gene[pathway_df$weight > 0])]))
-    neg_entrez <- unique(na.omit(symbol_to_entrez[as.character(pathway_df$gene[pathway_df$weight < 0])]))
-    all_entrez <- unique(na.omit(symbol_to_entrez[as.character(pathway_df$gene)]))
+    pos_entrez <- unique(stats::na.omit(symbol_to_entrez[as.character(pathway_df$gene[pathway_df$weight > 0])]))
+    neg_entrez <- unique(stats::na.omit(symbol_to_entrez[as.character(pathway_df$gene[pathway_df$weight < 0])]))
+    all_entrez <- unique(stats::na.omit(symbol_to_entrez[as.character(pathway_df$gene)]))
 
     if (length(pos_entrez)) {
       signed_sets[[paste0(pathway, "_UP")]] <- unname(pos_entrez)
@@ -410,14 +409,20 @@ normalize_collectri_direct_query <- function(collectri, split_complexes = FALSE)
     collectri_complex$source_genesymbol <- complex_symbols
   }
 
-  collapsed <- unique(rbind(collectri_interactions, collectri_complex))
+  collapsed <- rbind(collectri_interactions, collectri_complex)
   collapsed <- collapsed[
     !is.na(collapsed$source_genesymbol) &
       !is.na(collapsed$target_genesymbol),
     ,
     drop = FALSE
   ]
-  collapsed$mor <- ifelse(collapsed$is_stimulation == 1, 1, -1)
+  collapsed <- collapsed[!duplicated(collapsed[, c("source_genesymbol", "target_genesymbol")]), , drop = FALSE]
+  collapsed$mor <- ifelse(
+    collapsed$is_stimulation == 1,
+    1,
+    ifelse(collapsed$is_stimulation == 0, -1, NA_real_)
+  )
+  collapsed <- collapsed[!is.na(collapsed$mor), , drop = FALSE]
 
   data.frame(
     source = tools::toTitleCase(tolower(as.character(collapsed$source_genesymbol))),
@@ -427,32 +432,8 @@ normalize_collectri_direct_query <- function(collectri, split_complexes = FALSE)
   )
 }
 
-fetch_collectri_network <- function(organism = "human", split_complexes = FALSE) {
-  primary_result <- tryCatch(
-    decoupleR::get_collectri(
-      organism = organism,
-      split_complexes = split_complexes
-    ),
-    error = identity
-  )
-
-  if (!inherits(primary_result, "error")) {
-    return(primary_result)
-  }
-
-  if (!is_rat_species(organism)) {
-    stop(primary_result$message, call. = FALSE)
-  }
-
-  warning(
-    paste(
-      "decoupleR::get_collectri failed for rat; trying an OmnipathR fallback based on a direct CollecTRI interactions query.",
-      "This path still depends on OmnipathR and Ensembl species resolution."
-    ),
-    call. = FALSE
-  )
-
-  taxonomy_id <- collectri_taxonomy_id(organism)
+fetch_rat_collectri_network <- function(split_complexes = FALSE) {
+  taxonomy_id <- collectri_taxonomy_id("rat")
   fallback_attempts <- list(
     list(
       label = "OmnipathR::collectri(query_type = 'interactions', organism = 'rat')",
@@ -482,11 +463,11 @@ fetch_collectri_network <- function(organism = "human", split_complexes = FALSE)
     )
   )
 
-  fallback_errors <- character(0)
+  attempt_errors <- character(0)
   for (attempt in fallback_attempts) {
     raw_result <- tryCatch(attempt$run(), error = identity)
     if (inherits(raw_result, "error")) {
-      fallback_errors <- c(fallback_errors, sprintf("%s: %s", attempt$label, raw_result$message))
+      attempt_errors <- c(attempt_errors, sprintf("%s: %s", attempt$label, raw_result$message))
       next
     }
 
@@ -498,16 +479,26 @@ fetch_collectri_network <- function(organism = "human", split_complexes = FALSE)
       return(normalized)
     }
 
-    fallback_errors <- c(fallback_errors, sprintf("%s normalization: %s", attempt$label, normalized$message))
+    attempt_errors <- c(attempt_errors, sprintf("%s normalization: %s", attempt$label, normalized$message))
   }
 
   stop(
     paste(
-      "Failed to retrieve rat CollecTRI through decoupleR and all OmnipathR fallbacks.",
-      sprintf("Primary error: %s", primary_result$message),
-      sprintf("Fallback errors: %s", paste(fallback_errors, collapse = " | "))
+      "Failed to retrieve rat CollecTRI through the OmnipathR interactions route.",
+      sprintf("Attempt errors: %s", paste(attempt_errors, collapse = " | "))
     ),
     call. = FALSE
+  )
+}
+
+fetch_collectri_network <- function(organism = "human", split_complexes = FALSE) {
+  if (is_rat_species(organism)) {
+    return(fetch_rat_collectri_network(split_complexes = split_complexes))
+  }
+
+  decoupleR::get_collectri(
+    organism = organism,
+    split_complexes = split_complexes
   )
 }
 
@@ -519,7 +510,11 @@ download_collectri_gmt <- function(
     max_targets = 500,
     output_dir = "."
 ) {
-  if (!requireNamespace("decoupleR", quietly = TRUE)) {
+  if (is_rat_species(organism)) {
+    if (!requireNamespace("OmnipathR", quietly = TRUE)) {
+      stop("Install OmnipathR: BiocManager::install('OmnipathR')", call. = FALSE)
+    }
+  } else if (!requireNamespace("decoupleR", quietly = TRUE)) {
     stop("Install decoupleR: BiocManager::install('decoupleR')", call. = FALSE)
   }
 
@@ -648,17 +643,28 @@ download_collectri_gmt <- function(
 }
 
 download_all_pathway_gmt <- function(
-    org_db,
-    species = "Homo sapiens",
-    msigdb_db_species = NULL,
-    kegg_organism = "hsa",
-    progeny_organism = "human",
-    collectri_organism = "human",
+    org_db = NULL,
+    species = "human",
     collectri_min_targets = 10,
     collectri_max_targets = 500,
     msigdb_collections = c("H", "C2"),
-    output_dir = "pathway_gmt"
+    output_dir = "pathway_gmt",
+    ...
 ) {
+  reject_database_species_overrides(list(...), fun_name = "download_all_pathway_gmt")
+
+  config <- resolve_species_build_context(
+    species = species,
+    org_db = org_db
+  )
+  org_db <- config$org_db
+  species <- config$species
+  msigdb_db_species <- config$msigdb_db_species
+  kegg_organism <- config$kegg_organism
+  progeny_organism <- config$progeny_organism
+  collectri_organism <- config$collectri_organism
+  skip <- config$skip
+
   dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
   files <- list()
 
@@ -683,12 +689,14 @@ download_all_pathway_gmt <- function(
     output_dir = output_dir
   )
 
-  message("\n========== PROGENy ==========")
-  files$progeny <- download_progeny_gmt(
-    org_db = org_db,
-    organism = progeny_organism,
-    output_dir = output_dir
-  )
+  if (!("progeny" %in% skip)) {
+    message("\n========== PROGENy ==========")
+    files$progeny <- download_progeny_gmt(
+      org_db = org_db,
+      organism = progeny_organism,
+      output_dir = output_dir
+    )
+  }
 
   message("\n========== CollecTRI ==========")
   files$collectri <- download_collectri_gmt(

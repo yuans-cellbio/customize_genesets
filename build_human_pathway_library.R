@@ -7,14 +7,10 @@ if (is.null(wrapper_path)) {
 project_root <- dirname(normalizePath(wrapper_path, winslash = "/", mustWork = TRUE))
 
 source(file.path(project_root, "R", "load_project_code.R"), local = FALSE)
-
-library(org.Hs.eg.db)
+load_project_code(project_root)
 
 pathways <- build_pathway_library(
-  org_db = org.Hs.eg.db,
-  species = "Homo sapiens",
-  kegg_organism = "hsa",
-  progeny_organism = "human",
+  species = "human",
   include_IEA = TRUE,
   pos_keywords = NULL,
   neg_keywords = NULL,
@@ -28,7 +24,6 @@ pathways <- build_pathway_library(
     C7 = "IMMUNESIGDB"
   ),
   progeny_top_n = 100,
-  collectri_organism = "human",
   collectri_min_targets = 0,
   collectri_max_targets = 2000,
   skip = character(0),

@@ -9,13 +9,11 @@ if (is.null(wrapper_path)) {
 project_root <- dirname(normalizePath(wrapper_path, winslash = "/", mustWork = TRUE))
 
 source(file.path(project_root, "R", "load_project_code.R"), local = FALSE)
+load_project_code(project_root)
 
 if (sys.nframe() == 0) {
-  library(org.Hs.eg.db)
-
   result <- build_pathway_library(
-    org_db = org.Hs.eg.db,
-    species = "Homo sapiens",
+    species = "human",
     output_dir = "pathway_library"
   )
 }

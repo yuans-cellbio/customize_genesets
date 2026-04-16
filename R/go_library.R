@@ -1,9 +1,3 @@
-suppressPackageStartupMessages({
-  library(GO.db)
-  library(AnnotationDbi)
-  library(Matrix)
-})
-
 DEFAULT_POS_KEYWORDS <- c(
   "positive regulation", "activation of", "upregulation of",
   "induction of", "stimulation of", "promotion of",
@@ -32,7 +26,7 @@ discover_directional_keywords <- function(
   candidate_words = NULL
 ) {
   bp_terms <- AnnotationDbi::select(
-    GO.db,
+    GO.db::GO.db,
     keys = "BP",
     keytype = "ONTOLOGY",
     columns = c("GOID", "TERM")
@@ -70,7 +64,7 @@ discover_directional_keywords <- function(
       next
     }
 
-    examples <- head(bp_terms$TERM[matches], 3)
+    examples <- utils::head(bp_terms$TERM[matches], 3)
     results <- rbind(
       results,
       data.frame(
@@ -180,7 +174,7 @@ classify_regulation_terms <- function(
   pair_replacements = DEFAULT_DIRECTIONAL_PAIR_REPLACEMENTS
 ) {
   bp_terms <- AnnotationDbi::select(
-    GO.db,
+    GO.db::GO.db,
     keys = "BP",
     keytype = "ONTOLOGY",
     columns = c("GOID", "TERM")
@@ -246,9 +240,9 @@ filter_by_size <- function(gene_sets, min_size = 15, max_size = 500) {
 go_ancestor_lookup <- function(ontology = "BP") {
   switch(
     toupper(ontology),
-    "BP" = as.list(GOBPANCESTOR),
-    "CC" = as.list(GOCCANCESTOR),
-    "MF" = as.list(GOMFANCESTOR),
+    "BP" = as.list(GO.db::GOBPANCESTOR),
+    "CC" = as.list(GO.db::GOCCANCESTOR),
+    "MF" = as.list(GO.db::GOMFANCESTOR),
     stop("ontology must be one of: BP, CC, MF", call. = FALSE)
   )
 }
@@ -335,7 +329,7 @@ dedup_by_jaccard <- function(gene_sets, jaccard_threshold = 0.7, representative_
     col_indices <- c(col_indices, rep(col_idx, length(genes)))
   }
 
-  incidence_matrix <- sparseMatrix(
+  incidence_matrix <- Matrix::sparseMatrix(
     i = row_indices,
     j = col_indices,
     x = 1,
@@ -347,12 +341,12 @@ dedup_by_jaccard <- function(gene_sets, jaccard_threshold = 0.7, representative_
     "  Jaccard dedup: built %d x %d sparse matrix (%.1f%% sparse)",
     nrow(incidence_matrix),
     ncol(incidence_matrix),
-    (1 - nnzero(incidence_matrix) / (nrow(incidence_matrix) * ncol(incidence_matrix))) * 100
+    (1 - Matrix::nnzero(incidence_matrix) / (nrow(incidence_matrix) * ncol(incidence_matrix))) * 100
   ))
 
   intersection_matrix <- crossprod(incidence_matrix)
   set_sizes <- diff(incidence_matrix@p)
-  tri_summary <- summary(triu(intersection_matrix, k = 1))
+  tri_summary <- Matrix::summary(Matrix::triu(intersection_matrix, k = 1))
 
   if (!nrow(tri_summary)) {
     message("  Jaccard dedup: no overlapping pairs found")
@@ -635,7 +629,7 @@ build_go_dedup_library <- function(
   message("Fetching GO terms...")
 
   all_terms <- AnnotationDbi::select(
-    GO.db,
+    GO.db::GO.db,
     keys = ontology,
     keytype = "ONTOLOGY",
     columns = c("GOID", "TERM")
