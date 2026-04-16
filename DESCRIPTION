@@ -1,0 +1,33 @@
+Package: customizeGeneSets
+Title: Build Defensible Pathway Gene Set Libraries for Enrichment Analysis
+Version: 0.1.0
+Authors@R: 
+    person("yuans-cellbio", email = "yuans@pitt.edu", role = c("aut", "cre"))
+Author: yuans-cellbio [aut, cre]
+Maintainer: yuans-cellbio <yuans@pitt.edu>
+Description: Build pathway gene set libraries from GO, MSigDB, KEGG, Reactome,
+    PROGENy, and CollecTRI with a species-aware API and reproducible provenance.
+    The package also provides helper functions for loading GMT libraries and
+    running ORA or GSEA with consistent signed versus unsigned conventions.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: 
+    R (>= 4.1)
+Imports:
+    AnnotationDbi,
+    GO.db,
+    Matrix
+Suggests:
+    clusterProfiler,
+    decoupleR,
+    dplyr,
+    KEGGREST,
+    msigdbr,
+    OmnipathR,
+    org.Hs.eg.db,
+    org.Mm.eg.db,
+    org.Rn.eg.db,
+    progeny,
+    reactome.db,
+    testthat
+Config/testthat/edition: 3

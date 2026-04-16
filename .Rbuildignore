@@ -1,0 +1,14 @@
+^\.git$
+^\.gitignore$
+^\.Rhistory$
+^\.package-library$
+^\.pkg-library$
+^\.tmp-lib$
+^\.\.Rcheck$
+^customizeGeneSets\.Rcheck$
+^omnipathr-log$
+^pathway_library$
+^build_go_regulation_gmt[.]R$
+^build_human_pathway_library[.]R$
+^build_pathway_library[.]R$
+^download_pathway_gmt[.]R$
