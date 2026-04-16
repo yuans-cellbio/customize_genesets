@@ -6,21 +6,28 @@ Auto-generated pathway library for enrichment analysis (ORA / GSEA).
 
 | Field | Value |
 |-------|-------|
-| Date | 2026-03-26 14:23:52 EDT |
+| Date | 2026-04-16 00:15:14 EDT |
 | R version | 4.5.1 |
 | Platform | x86_64-w64-mingw32 |
 
 ## Database Versions
 
 | Database | Package Version | Source Info |
-|----------|----------------|-------------|
+|----------|-----------------|-------------|
 | GO.db | 3.21.0 | Source date: 2025-02-06 |
 | OrgDb (org.Hs.eg.db) | 3.21.0 | Schema: HUMAN_DB |
 | msigdbr | 26.1.0 | MSigDB v26.1 |
-| KEGGREST | 1.48.1 | Retrieved: 2026-03-26 |
+| KEGGREST | 1.48.1 | Retrieved: 2026-04-16 |
 | reactome.db | 1.92.0 | DB version: 92 |
 | progeny | 1.30.0 | - |
-| decoupleR (CollecTRI) | 2.14.0 | Retrieved: 2026-03-26 |
+| decoupleR (CollecTRI) | 2.14.0 | Retrieved: 2026-04-16 |
+
+## Methodology Notes
+
+- GO BP signed terms are classified from GO term names using explicit positive/negative keyword lists.
+- Sibling pairing is conservative: only explicit text replacements (for example positive/negative regulation) are used when forcing pair retention.
+- GO libraries are filtered by gene-set size, pruned by GO DAG ancestor overlap, and deduplicated by Jaccard overlap while preferring more specific GO terms.
+- External libraries are exported as Entrez-based GMT files for direct use with clusterProfiler-style workflows.
 
 ## Parameters
 
@@ -47,55 +54,51 @@ skipped = none
 
 ### GO Biological Process
 
-- **go_homo_sapiens_bp_dedup_signed_all_evidence.gmt** — 813 gene sets (340.8 KB)
-- **go_homo_sapiens_bp_dedup_unsigned_all_evidence.gmt** — 2763 gene sets (1320.9 KB)
+- **go_homo_sapiens_bp_dedup_signed_all_evidence.gmt** - 790 gene sets (323 KB)
+- **go_homo_sapiens_bp_dedup_unsigned_all_evidence.gmt** - 2763 gene sets (1272.7 KB)
 
 ### GO Cellular Component
 
-- **go_homo_sapiens_cc_dedup_all_evidence.gmt** — 461 gene sets (248.8 KB)
+- **go_homo_sapiens_cc_dedup_all_evidence.gmt** - 461 gene sets (244.1 KB)
 
 ### GO Molecular Function
 
-- **go_homo_sapiens_mf_dedup_all_evidence.gmt** — 744 gene sets (315.8 KB)
+- **go_homo_sapiens_mf_dedup_all_evidence.gmt** - 744 gene sets (307.2 KB)
 
 ### MSigDB
 
-- **msigdb_h_homo_sapiens.gmt** — 50 gene sets (41.4 KB)
-- **msigdb_c2_cp_wikipathways_homo_sapiens.gmt** — 925 gene sets (283.5 KB)
-- **msigdb_c7_immunesigdb_homo_sapiens.gmt** — 4872 gene sets (5962.1 KB)
+- **msigdb_h_homo_sapiens.gmt** - 50 gene sets (41.4 KB)
+- **msigdb_c2_cp_wikipathways_homo_sapiens.gmt** - 925 gene sets (283.5 KB)
+- **msigdb_c7_immunesigdb_homo_sapiens.gmt** - 4872 gene sets (5962.1 KB)
 
 ### KEGG
 
-- **kegg_hsa.gmt** — 357 gene sets (204.9 KB)
+- **kegg_hsa.gmt** - 357 gene sets (204.9 KB)
 
 ### Reactome
 
-- **reactome_homo_sapiens.gmt** — 2746 gene sets (839.9 KB)
+- **reactome_homo_sapiens.gmt** - 2746 gene sets (839.9 KB)
 
 ### PROGENy
 
-- **progeny_signed_human_top100.gmt** — 25 gene sets (8.1 KB)
-- **progeny_unsigned_human_top100.gmt** — 14 gene sets (7.6 KB)
+- **progeny_signed_human_top100.gmt** - 25 gene sets (8.4 KB)
+- **progeny_unsigned_human_top100.gmt** - 14 gene sets (7.9 KB)
 
 ### CollecTRI
 
-- **collectri_signed_human.gmt** — 2372 gene sets (295.6 KB)
-- **collectri_unsigned_human.gmt** — 1186 gene sets (248.4 KB)
+- **collectri_signed_human.gmt** - 1849 gene sets (277.1 KB)
+- **collectri_unsigned_human.gmt** - 1186 gene sets (248.4 KB)
 
 ## Usage with clusterProfiler
 
 ```r
 library(clusterProfiler)
-source("build_go_regulation_gmt.R")  # for read_gmt_term2name()
+source("R/load_project_code.R")
 
-# Load any GMT file
-gmt       <- read.gmt("path/to/file.gmt")
+gmt <- read.gmt("path/to/file.gmt")
 gmt_names <- read_gmt_term2name("path/to/file.gmt")
 
-# ORA
 enricher(gene = my_genes, universe = bg, TERM2GENE = gmt, TERM2NAME = gmt_names)
-
-# GSEA
 GSEA(geneList = my_ranked_genes, TERM2GENE = gmt, TERM2NAME = gmt_names)
 ```
 
