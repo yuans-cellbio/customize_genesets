@@ -222,11 +222,21 @@ library(org.Hs.eg.db)
 
 libs <- load_pathway_libraries("pathway_library")
 
-signed_rank <- c("7157" = 5.2, "1956" = -4.0, "5290" = 3.1)
+signed_rank <- c("7157" = 5.2, "1956" = -4.0, "5290" = 3.1, "4609" = -2.2)
 
-ora_result <- run_ora(
+ora_ranked <- run_ora(
   signed_rank = signed_rank,
   gene_fraction = 0.10,
+  org_db = org.Hs.eg.db,
+  signed_library = libs$signed,
+  unsigned_library = libs$unsigned
+)
+
+selected_genes <- signed_rank[c("7157", "1956")]
+
+ora_explicit <- run_ora(
+  selected_genes = selected_genes,
+  universe = names(signed_rank),
   org_db = org.Hs.eg.db,
   signed_library = libs$signed,
   unsigned_library = libs$unsigned
@@ -355,14 +365,16 @@ Returns:
 ### `run_ora()`
 
 Purpose:
-Run ORA on signed and unsigned libraries using a named numeric vector of signed gene-level statistics.
+Run ORA on signed and unsigned libraries in one of two modes:
+- ranked-selection mode via `signed_rank`, where `gene_fraction` selects the top genes by absolute statistic.
+- explicit-hit mode via `selected_genes`, where the supplied genes are used directly as the ORA foreground.
 
 Arguments:
-- `signed_rank`: named numeric vector of Entrez-based signed statistics.
-- `gene_fraction`: fraction of top absolute-ranked genes used for ORA.
-- `top_frac_threshold`: backward-compatible alias for `gene_fraction`.
+- `signed_rank`: optional named numeric vector of Entrez-based signed statistics for ranked-selection mode.
+- `selected_genes`: optional named numeric vector of selected Entrez-based signed statistics for explicit-hit mode. The supplied genes are used directly for ORA; the sign is still used to split signed libraries into up and down subsets.
+- `gene_fraction`: fraction of top absolute-ranked genes used for ORA when `signed_rank` is supplied. Leave `NULL` or set to `1` when `selected_genes` is supplied.
 - `org_db`: `OrgDb` object used to make results readable.
-- `universe`: optional background gene universe.
+- `universe`: optional background gene universe in ranked-selection mode; required in explicit-hit mode.
 - `signed_library`, `unsigned_library`: outputs from `load_pathway_libraries()`.
 - `pvalueCutoff`, `qvalueCutoff`, `pAdjustMethod`, `minGSSize`, `maxGSSize`: parameters forwarded to the enrichment workflow.
 
@@ -398,7 +410,9 @@ Returns:
 
 - Signed libraries are intended for directional interpretation.
 - Unsigned libraries are intended for magnitude-based interpretation.
-- In `run_ora()`, the ORA input list is selected explicitly by `gene_fraction` from the ranked vector.
+- In `run_ora()`, `signed_rank` invokes ranked-selection mode, so the ORA input list is selected by `gene_fraction` from the full ranked vector.
+- In `run_ora()`, `selected_genes` invokes explicit-hit mode, so the ORA input list is the supplied foreground and `universe` defines the background.
+- In explicit-hit mode, the numeric values in `selected_genes` are only used to split signed libraries into `up` and `down`; unsigned libraries only use gene membership.
 - In `run_gsea()`, signed libraries use the signed statistic, while unsigned libraries use the absolute statistic.
 
 That distinction is important: unsigned enrichments should be interpreted as strong perturbation, not necessarily upregulation.

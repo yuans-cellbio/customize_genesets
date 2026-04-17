@@ -2,14 +2,14 @@
 \alias{run_ora}
 \title{Run Over-Representation Analysis on Signed and Unsigned Libraries}
 \description{
-Run ORA against signed and unsigned pathway libraries using a named numeric
-vector of signed gene-level statistics.
+Run ORA against signed and unsigned pathway libraries using either a full
+ranked vector or an explicitly selected gene foreground.
 }
 \usage{
 run_ora(
-    signed_rank,
+    signed_rank = NULL,
+    selected_genes = NULL,
     gene_fraction = NULL,
-    top_frac_threshold = NULL,
     org_db,
     universe = NULL,
     signed_library,
@@ -22,16 +22,21 @@ run_ora(
 )
 }
 \arguments{
-  \item{signed_rank}{Named numeric vector of gene-level signed statistics using
-  Entrez Gene IDs as names.}
+  \item{signed_rank}{Optional named numeric vector of gene-level signed
+  statistics using Entrez Gene IDs as names. Supply this to use ranked-selection
+  mode.}
+  \item{selected_genes}{Optional named numeric vector of selected gene-level
+  signed statistics using Entrez Gene IDs as names. Supply this to use
+  explicit-hit mode, where the provided genes are used directly as the ORA
+  foreground.}
   \item{gene_fraction}{Fraction of genes to carry into ORA based on the
-  absolute statistic.}
-  \item{top_frac_threshold}{Backward-compatible alias for
-  \code{gene_fraction}.}
+  absolute statistic when \code{signed_rank} is supplied. Leave \code{NULL} or
+  set it to \code{1} when using \code{selected_genes}.}
   \item{org_db}{An \code{OrgDb} object used to make the enrichment results
   human-readable.}
-  \item{universe}{Optional background gene universe. Defaults to the names of
-  \code{signed_rank}.}
+  \item{universe}{Background gene universe. Defaults to the names of
+  \code{signed_rank} in ranked-selection mode and must be supplied in
+  explicit-hit mode.}
   \item{signed_library}{List of signed library entries from
   \code{load_pathway_libraries()}.}
   \item{unsigned_library}{List of unsigned library entries from
@@ -52,7 +57,12 @@ A data frame of combined ORA results, or \code{NULL} when no enrichments are
 returned.
 }
 \details{
-Signed libraries are tested separately against the up- and down-ranked subsets.
-Unsigned libraries are tested against the union of genes selected by absolute
-rank magnitude.
+In ranked-selection mode, signed libraries are tested separately against the up-
+and down-ranked subsets chosen by \code{gene_fraction}, while unsigned
+libraries are tested against their union.
+
+In explicit-hit mode, the supplied \code{selected_genes} are used directly as
+the ORA foreground. Their numeric values are only used to split signed
+libraries into up- and down-selected subsets; unsigned libraries use gene
+membership only.
 }

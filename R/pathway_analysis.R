@@ -23,21 +23,36 @@ load_pathway_libraries <- function(pathway_dir = "pathway_library") {
   )
 }
 
-validate_signed_rank <- function(signed_rank) {
+validate_signed_rank <- function(signed_rank, arg_name = "signed_rank") {
   if (!is.numeric(signed_rank)) {
-    stop("signed_rank must be a numeric vector", call. = FALSE)
+    stop(sprintf("%s must be a numeric vector", arg_name), call. = FALSE)
   }
   if (is.null(names(signed_rank))) {
-    stop("signed_rank must be a named vector of Entrez IDs", call. = FALSE)
+    stop(sprintf("%s must be a named vector of Entrez IDs", arg_name), call. = FALSE)
   }
 
   keep <- is.finite(signed_rank) & !is.na(names(signed_rank)) & nzchar(names(signed_rank))
   signed_rank <- signed_rank[keep]
   if (!length(signed_rank)) {
-    stop("signed_rank does not contain any usable genes", call. = FALSE)
+    stop(sprintf("%s does not contain any usable genes", arg_name), call. = FALSE)
   }
 
   signed_rank[!duplicated(names(signed_rank))]
+}
+
+validate_gene_ids <- function(gene_ids, arg_name) {
+  if (!is.atomic(gene_ids)) {
+    stop(sprintf("%s must be an atomic vector of gene IDs", arg_name), call. = FALSE)
+  }
+
+  gene_ids <- as.character(gene_ids)
+  gene_ids <- gene_ids[!is.na(gene_ids) & nzchar(gene_ids)]
+  gene_ids <- unique(gene_ids)
+  if (!length(gene_ids)) {
+    stop(sprintf("%s does not contain any usable genes", arg_name), call. = FALSE)
+  }
+
+  gene_ids
 }
 
 select_ranked_genes_for_ora <- function(signed_rank, gene_fraction = 0.1) {
@@ -55,6 +70,63 @@ select_ranked_genes_for_ora <- function(signed_rank, gene_fraction = 0.1) {
     selected = selected,
     up = names(signed_rank)[signed_rank > 0 & names(signed_rank) %in% selected],
     down = names(signed_rank)[signed_rank < 0 & names(signed_rank) %in% selected]
+  )
+}
+
+resolve_ora_gene_input <- function(
+    signed_rank = NULL,
+    selected_genes = NULL,
+    gene_fraction = NULL,
+    universe = NULL
+) {
+  using_ranked_input <- !is.null(signed_rank)
+  using_selected_input <- !is.null(selected_genes)
+
+  if (using_ranked_input == using_selected_input) {
+    stop("Provide exactly one of signed_rank or selected_genes", call. = FALSE)
+  }
+
+  if (using_ranked_input) {
+    signed_rank <- validate_signed_rank(signed_rank, arg_name = "signed_rank")
+    gene_fraction <- gene_fraction %||% 0.1
+    selected <- select_ranked_genes_for_ora(signed_rank, gene_fraction = gene_fraction)
+    universe <- if (is.null(universe)) names(signed_rank) else validate_gene_ids(universe, "universe")
+    if (!all(selected$selected %in% universe)) {
+      stop("universe must include all selected genes", call. = FALSE)
+    }
+
+    return(list(
+      mode = "ranked",
+      selected = selected,
+      universe = universe
+    ))
+  }
+
+  selected_genes <- validate_signed_rank(selected_genes, arg_name = "selected_genes")
+  if (!is.null(gene_fraction)) {
+    assert_probability(gene_fraction, "gene_fraction")
+    if (!isTRUE(all.equal(gene_fraction, 1))) {
+      stop("gene_fraction must be 1 when selected_genes is supplied", call. = FALSE)
+    }
+  }
+  if (is.null(universe)) {
+    stop("universe must be supplied when selected_genes is used", call. = FALSE)
+  }
+
+  universe <- validate_gene_ids(universe, "universe")
+  selected <- list(
+    selected = names(selected_genes),
+    up = names(selected_genes)[selected_genes > 0],
+    down = names(selected_genes)[selected_genes < 0]
+  )
+  if (!all(selected$selected %in% universe)) {
+    stop("universe must include all selected genes", call. = FALSE)
+  }
+
+  list(
+    mode = "selected",
+    selected = selected,
+    universe = universe
   )
 }
 
@@ -105,9 +177,9 @@ adjust_enrichment_results <- function(result_df, p_adjust_method = "BH") {
 }
 
 run_ora <- function(
-    signed_rank,
+    signed_rank = NULL,
+    selected_genes = NULL,
     gene_fraction = NULL,
-    top_frac_threshold = NULL,
     org_db,
     universe = NULL,
     signed_library,
@@ -125,13 +197,14 @@ run_ora <- function(
     stop("Install dplyr to combine ORA results", call. = FALSE)
   }
 
-  signed_rank <- validate_signed_rank(signed_rank)
-  gene_fraction <- gene_fraction %||% top_frac_threshold %||% 0.1
-  selected <- select_ranked_genes_for_ora(signed_rank, gene_fraction = gene_fraction)
-
-  if (is.null(universe)) {
-    universe <- names(signed_rank)
-  }
+  ora_input <- resolve_ora_gene_input(
+    signed_rank = signed_rank,
+    selected_genes = selected_genes,
+    gene_fraction = gene_fraction,
+    universe = universe
+  )
+  selected <- ora_input$selected
+  universe <- ora_input$universe
 
   run_single_ora <- function(library_entry, gene_ids, direction_label) {
     if (!length(gene_ids)) {

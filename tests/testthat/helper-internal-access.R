@@ -10,6 +10,7 @@ internal_test_functions <- c(
   "normalize_collectri_direct_query",
   "organism_name_from_orgdb",
   "prepare_gsea_rankings",
+  "resolve_ora_gene_input",
   "resolve_msigdb_db_species",
   "resolve_species_build_context",
   "select_ranked_genes_for_ora",
