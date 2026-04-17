@@ -1,13 +1,13 @@
 # Customize Gene Sets
 
-Build reproducible pathway GMT libraries for enrichment analysis, with a focus on defensible GO processing, explicit provenance, and code that is easier to troubleshoot than a single monolithic script.
+Build reproducible pathway local GMT signed/unsigned libraries for enrichment analysis, with GO deduplication.
 
 This repo does two related jobs:
 
 1. It builds pathway libraries from GO, MSigDB, KEGG, Reactome, PROGENy, and CollecTRI.
 2. It provides helper functions for running ORA and GSEA against those libraries in a consistent way.
 
-The generated human library lives in [`pathway_library/README.md`](./pathway_library/README.md), which records the exact build date, package versions, parameters, and file inventory for the checked-in artifacts.
+A markdown file is genereated in the local pathway library [`path_to_library/README.md`](./path_to_library/README.md), which records the exact build date, package versions, parameters, and file inventory for the checked-in artifacts.
 
 ## Why This Repo Exists
 
@@ -16,9 +16,6 @@ Many pathway workflows mix several pain points:
 - GMT files come from different sources and use different identifier systems.
 - GO collections are often highly redundant and hard to interpret.
 - Signed and unsigned libraries are easily conflated in downstream analysis.
-- Older scripts tend to accumulate hidden assumptions that are hard to audit.
-
-This project tries to make those assumptions visible and testable.
 
 ## Core Methodology
 
@@ -40,17 +37,6 @@ This project tries to make those assumptions visible and testable.
 - Rat CollecTRI: built from the direct `OmnipathR::collectri(query_type = "interactions", organism = "rat")` route, then normalized into the same signed and unsigned GMT interface used elsewhere in the repo.
 - Rat PROGENy: not supported in this pipeline. Rat builds omit that step by design and report it as an informational message.
 
-## Common Use Cases
-
-- Build a defensible human pathway library for transcriptomics or proteomics enrichment analysis.
-- Replace inherited GMT files with a versioned build that records package versions and retrieval dates.
-- Generate a signed GO BP library for analyses where directionality matters.
-- Build mouse-native MSigDB pathway libraries without falling back to human ortholog mapping.
-- Build a rat pathway library with the supported rat sources wired automatically and unsupported sources omitted cleanly.
-- Combine broad pathway databases like Reactome and KEGG with footprint-style resources like PROGENy and CollecTRI.
-- Customize the GO keyword lists or pathway-source parameters for a specific biological question.
-- Troubleshoot one data source at a time instead of rerunning the full pipeline.
-
 ## Project Layout
 
 - `R/pathway_helpers.R`: shared validation, GMT IO, ID mapping, species helpers, and module-loading helpers.
@@ -62,7 +48,6 @@ This project tries to make those assumptions visible and testable.
 - `download_pathway_gmt.R`: lightweight wrapper for downloading/exporting non-GO sources.
 - `build_pathway_library.R`: lightweight wrapper for the default full build.
 - `build_human_pathway_library.R`: checked-in human build entry point used to regenerate `pathway_library/`.
-- `pathway_analysis.Rmd`: example downstream analysis notebook using the shared helpers.
 - `tests/testthat/`: unit tests plus a smoke test for the offline-capable build path.
 
 ## Installation
@@ -81,23 +66,11 @@ source("R/load_project_code.R")
 load_project_code()
 ```
 
-Once the package is installed, the user-facing functions also have package help pages such as `?build_pathway_library`, `?run_ora`, and `?download_collectri_gmt`.
+The user-facing functions are `build_pathway_library`, `run_ora`, and `run_gsea`.
 
 ## Typical Workflows
 
-### 1. Use the checked-in human library
-
-If you just want the current human GMT files, start in `pathway_library/`.
-
-```r
-library(clusterProfiler)
-library(customizeGeneSets)
-
-gmt <- read.gmt("pathway_library/reactome_homo_sapiens.gmt")
-gmt_names <- read_gmt_term2name("pathway_library/reactome_homo_sapiens.gmt")
-```
-
-### 2. Rebuild the default human library
+### 1. Build a local library
 
 ```r
 library(customizeGeneSets)
@@ -108,9 +81,11 @@ build_pathway_library(
 )
 ```
 
-### 3. Rebuild with custom parameters
+This builds a local library under ./pathway_library. `species` can be "human", "mouse", or "rat".
 
-Use this when you want to change GO filtering thresholds, select different MSigDB collections, or skip network-backed resources during development.
+### 2. Rebuild with custom parameters
+
+Use this when you want to change GO filtering thresholds, select different MSigDB collections, or skip network-backed resources.
 
 ```r
 library(customizeGeneSets)
@@ -126,75 +101,7 @@ build_pathway_library(
 )
 ```
 
-### 4. Build a mouse library
-
-The top-level builder now aligns the species-specific settings automatically for mouse builds:
-
-- `species` is canonicalized to `Mus musculus`
-- the matching `OrgDb` is inferred as `org.Mm.eg.db`
-- mouse-native MSigDB is selected with `db_species = "MM"`
-- requested human-style collection codes such as `H`, `C2`, and `C7` are translated to mouse-native codes such as `MH`, `M2`, and `M7`
-- KEGG, PROGENy, and CollecTRI receive the correct mouse organism keys internally
-
-```r
-library(customizeGeneSets)
-
-build_pathway_library(
-  species = "mouse",
-  output_dir = "pathway_library_mouse"
-)
-```
-
-If you want to use a custom `OrgDb` object anyway, you still can:
-
-```r
-library(customizeGeneSets)
-library(org.Mm.eg.db)
-
-build_pathway_library(
-  species = "mouse",
-  org_db = org.Mm.eg.db,
-  output_dir = "pathway_library_mouse"
-)
-```
-
-### 5. Build a rat library
-
-Rat builds also align the species-specific settings:
-
-- `species` is canonicalized to `Rattus norvegicus`
-- the matching `OrgDb` is inferred as `org.Rn.eg.db`
-- rat CollecTRI uses the direct OmnipathR interactions query and the same normalization logic as the standalone workaround
-- rat PROGENy is omitted automatically because there is no rat PROGENy model in this pipeline
-- rat MSigDB uses ortholog mapping from the human MSigDB database
-- rat MSigDB filenames therefore keep the human-style collection codes such as `msigdb_h_rattus_norvegicus.gmt`
-- KEGG and CollecTRI receive the correct rat organism keys internally
-
-```r
-library(customizeGeneSets)
-
-build_pathway_library(
-  species = "rat",
-  output_dir = "pathway_library_rat"
-)
-```
-
-If you want to pass a custom `OrgDb`, it must match the declared species:
-
-```r
-library(customizeGeneSets)
-library(org.Rn.eg.db)
-
-build_pathway_library(
-  species = "rat",
-  org_db = org.Rn.eg.db,
-  output_dir = "pathway_library_rat"
-)
-```
-
-If you need to control database-specific organism routes manually, call the lower-level `download_*()` function for that source instead of the top-level builder.
-
-### 6. Build only GO libraries
+### 3. Build only GO libraries
 
 Useful when you are tuning GO-specific methodology and do not want network traffic or non-GO dependencies on the critical path.
 
@@ -214,7 +121,13 @@ build_go_dedup_library(
 )
 ```
 
-### 7. Run ORA and GSEA with the helper layer
+### 4. Run ORA and GSEA with the helper functions
+
+You can run an over-representation test by using the full rank as input. All genes in the full rank were used as the background (universe).
+
+For unsigned libraries, the top 10% genes (defined by `gene_fraction`) by absolute ranking values (so both positve and negative genes are included) were selected as the forground.
+
+For signed libraries, the positive genes in the top fraction genes were tested against gene sets with a positive role on the pathway, and vice versa.
 
 ```r
 library(customizeGeneSets)
@@ -231,7 +144,10 @@ ora_ranked <- run_ora(
   signed_library = libs$signed,
   unsigned_library = libs$unsigned
 )
+```
+Alternatively, you can specify what genes to be used as the foreground (e.g., by p-value or fold change). In this case, you must choose the correct background (universe), which is typically all the genes in the dataset. 
 
+```r
 selected_genes <- signed_rank[c("7157", "1956")]
 
 ora_explicit <- run_ora(
@@ -241,7 +157,10 @@ ora_explicit <- run_ora(
   signed_library = libs$signed,
   unsigned_library = libs$unsigned
 )
+```
+Gene set enrichment analysis requires the full rank genes. 
 
+```r
 gsea_result <- run_gsea(
   signed_rank = signed_rank,
   org_db = org.Hs.eg.db,
@@ -466,12 +385,5 @@ What the tests cover:
 - If you need mouse-native MSigDB collections, let the mouse defaults choose them automatically.
 - If you need rat MSigDB, expect human MSigDB ortholog mapping through `msigdbr`.
 - If a downstream analysis fails because of gene identifiers, confirm your inputs are Entrez IDs or convert them before enrichment.
-- If you want to inspect the exact settings used for the checked-in library, read [`pathway_library/README.md`](./pathway_library/README.md).
+- If you want to inspect the exact settings used for the checked-in library, read [`path_to_library/README.md`](./path_to_library/README.md).
 - If you want to change biological assumptions, start in `R/go_library.R` and `R/pathway_downloaders.R` instead of editing the wrapper scripts.
-
-## Recommended Entry Points
-
-- Use `build_human_pathway_library.R` to regenerate the checked-in human artifacts.
-- Use `build_pathway_library()` for a normal full rebuild from code.
-- Use `build_go_regulation_library()` and `build_go_dedup_library()` when working specifically on GO methodology.
-- Use `run_ora()` and `run_gsea()` when you want downstream analyses to follow the same signed-versus-unsigned conventions as the repo.
