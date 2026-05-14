@@ -30,6 +30,22 @@ test_that("mouse-native MSigDB collection codes are translated correctly", {
   expect_equal(translate_msigdb_collection_code("H", db_species = "HS"), "H")
 })
 
+test_that("library filename helpers use explicit non-redundant tags", {
+  expect_equal(msigdb_file_tag("H"), "hallmark")
+  expect_equal(msigdb_file_tag("MH"), "hallmark")
+  expect_equal(msigdb_file_tag("C2", "CP:REACTOME"), "c2_cp_reactome")
+  expect_equal(species_slug_from_organism_key("hsa"), "homo_sapiens")
+  expect_equal(species_slug_from_organism_key("human"), "homo_sapiens")
+  expect_equal(species_slug_from_organism_key("rno"), "rattus_norvegicus")
+  expect_equal(species_slug_from_organism_key("rat"), "rattus_norvegicus")
+
+  expect_true(is_signed_library_path("go_homo_sapiens_bp_signed_dedup_all_evidence.gmt"))
+  expect_true(is_unsigned_library_path("go_rattus_norvegicus_cc_unsigned_dedup_all_evidence.gmt"))
+  expect_true(is_signed_library_path("collectri_rattus_norvegicus_signed.gmt"))
+  expect_true(is_unsigned_library_path("progeny_homo_sapiens_unsigned_top100.gmt"))
+  expect_false(is_signed_library_path("msigdb_rattus_norvegicus_hallmark.gmt"))
+})
+
 test_that("species build context infers matching OrgDb objects and internal keys", {
   skip_if_not_installed("org.Hs.eg.db")
   skip_if_not_installed("org.Mm.eg.db")

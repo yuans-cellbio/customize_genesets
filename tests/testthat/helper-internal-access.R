@@ -6,7 +6,10 @@ internal_test_functions <- c(
   "is_human_species",
   "is_mouse_species",
   "is_rat_species",
+  "is_signed_library_path",
+  "is_unsigned_library_path",
   "map_symbols_to_entrez",
+  "msigdb_file_tag",
   "normalize_collectri_direct_query",
   "organism_name_from_orgdb",
   "prepare_gsea_rankings",
@@ -14,6 +17,7 @@ internal_test_functions <- c(
   "resolve_msigdb_db_species",
   "resolve_species_build_context",
   "select_ranked_genes_for_ora",
+  "species_slug_from_organism_key",
   "translate_msigdb_collection_code",
   "validate_signed_rank",
   "write_gmt_from_list"

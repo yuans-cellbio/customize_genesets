@@ -29,6 +29,23 @@ Many pathway workflows mix several pain points:
 - `build_pathway_library()` and `download_all_pathway_gmt()` now treat `species` as the public species switch and infer the matching `OrgDb` plus per-database organism keys internally.
 - External resources are exported into the same GMT-style interface so they can be used side by side in `clusterProfiler` workflows.
 
+## GMT Filename Convention
+
+Generated GMT files use an organism-first, explicit naming convention:
+
+`source_species_or_key_collection_direction_modifiers.gmt`
+
+Examples:
+- `go_homo_sapiens_bp_signed_dedup_all_evidence.gmt`
+- `go_rattus_norvegicus_bp_unsigned_dedup_all_evidence.gmt`
+- `go_rattus_norvegicus_cc_unsigned_dedup_all_evidence.gmt`
+- `msigdb_rattus_norvegicus_hallmark.gmt`
+- `kegg_rattus_norvegicus.gmt`
+- `progeny_homo_sapiens_signed_top100.gmt`
+- `collectri_rattus_norvegicus_unsigned.gmt`
+
+MSigDB Hallmark files use the literal `hallmark` label rather than the compact `H` or mouse-native `MH` collection codes.
+
 ## Species Support
 
 - Human: fully supported by the checked-in build and all main workflows.

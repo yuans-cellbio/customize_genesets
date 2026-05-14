@@ -3,10 +3,15 @@ load_pathway_libraries <- function(pathway_dir = "pathway_library") {
     stop("Install clusterProfiler to load GMT files", call. = FALSE)
   }
 
-  signed_paths <- list.files(pathway_dir, pattern = ".*_signed.*\\.gmt$", full.names = TRUE)
-  unsigned_paths <- setdiff(
-    list.files(pathway_dir, pattern = "\\.gmt$", full.names = TRUE),
-    signed_paths
+  gmt_paths <- list.files(pathway_dir, pattern = "\\.gmt$", full.names = TRUE)
+  signed_paths <- gmt_paths[vapply(gmt_paths, is_signed_library_path, logical(1))]
+  neutral_paths <- gmt_paths[
+    !vapply(gmt_paths, is_signed_library_path, logical(1)) &
+      !vapply(gmt_paths, is_unsigned_library_path, logical(1))
+  ]
+  unsigned_paths <- c(
+    gmt_paths[vapply(gmt_paths, is_unsigned_library_path, logical(1))],
+    neutral_paths
   )
 
   load_single_library <- function(filepath) {

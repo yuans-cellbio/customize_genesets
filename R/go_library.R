@@ -512,7 +512,7 @@ build_go_regulation_library <- function(
 
   signed_file <- file.path(
     output_dir,
-    sprintf("go_%s_bp_dedup_signed_%s.gmt", organism_slug, evidence_tag)
+    sprintf("go_%s_bp_signed_dedup_%s.gmt", organism_slug, evidence_tag)
   )
   write_gmt_from_terms(signed_gene_sets, terms$term_df, signed_file)
 
@@ -539,7 +539,7 @@ build_go_regulation_library <- function(
 
   unsigned_file <- file.path(
     output_dir,
-    sprintf("go_%s_bp_dedup_unsigned_%s.gmt", organism_slug, evidence_tag)
+    sprintf("go_%s_bp_unsigned_dedup_%s.gmt", organism_slug, evidence_tag)
   )
   write_gmt_from_terms(unsigned_gene_sets, terms$term_df, unsigned_file)
 
@@ -658,7 +658,7 @@ build_go_dedup_library <- function(
 
   gmt_file <- file.path(
     output_dir,
-    sprintf("go_%s_%s_dedup_%s.gmt", organism_slug, tolower(ontology), evidence_tag)
+    sprintf("go_%s_%s_unsigned_dedup_%s.gmt", organism_slug, tolower(ontology), evidence_tag)
   )
   write_gmt_from_terms(gene_sets, all_terms, gmt_file)
 

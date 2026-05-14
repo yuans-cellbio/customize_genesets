@@ -62,7 +62,7 @@ download_msigdb_gmt <- function(
   species <- canonical_species_name(species)
   db_species <- resolve_msigdb_db_species(species, db_species = db_species)
   dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
-  species_tag <- gsub(" ", "_", tolower(species))
+  species_tag <- species_slug(species)
   available <- msigdbr::msigdbr_collections(db_species = db_species)
 
   if (identical(collections, "all")) {
@@ -105,7 +105,7 @@ download_msigdb_gmt <- function(
         species = species,
         collection = collection
       )
-      file_tag <- tolower(collection)
+      file_tag <- msigdb_file_tag(collection)
     } else {
       msigdb_df <- msigdbr::msigdbr(
         db_species = db_species,
@@ -113,7 +113,7 @@ download_msigdb_gmt <- function(
         collection = collection,
         subcollection = subcollection
       )
-      file_tag <- paste0(tolower(collection), "_", tolower(gsub("[: ]", "_", subcollection)))
+      file_tag <- msigdb_file_tag(collection, subcollection)
     }
 
     if (!nrow(msigdb_df)) {
@@ -126,7 +126,7 @@ download_msigdb_gmt <- function(
     description_df <- unique(msigdb_df[, c("gs_name", "gs_description"), drop = FALSE])
     descriptions <- stats::setNames(description_df$gs_description, description_df$gs_name)
 
-    filepath <- file.path(output_dir, sprintf("msigdb_%s_%s.gmt", file_tag, species_tag))
+    filepath <- file.path(output_dir, sprintf("msigdb_%s_%s.gmt", species_tag, file_tag))
     write_gmt_from_list(gene_sets, descriptions, filepath)
     files[[requested_collection]] <- filepath
   }
@@ -180,7 +180,8 @@ download_kegg_gmt <- function(
   gene_sets <- gene_sets[lengths(gene_sets) > 0]
   message(sprintf("  %d pathways with gene annotations", length(gene_sets)))
 
-  filepath <- file.path(output_dir, sprintf("kegg_%s.gmt", organism))
+  species_tag <- species_slug_from_organism_key(organism)
+  filepath <- file.path(output_dir, sprintf("kegg_%s.gmt", species_tag))
   write_gmt_from_list(gene_sets, descriptions, filepath)
   invisible(filepath)
 }
@@ -212,7 +213,7 @@ download_reactome_gmt <- function(
     gene_sets <- lapply(split(reactome_df$ncbi_gene, reactome_df$gs_name), unique)
     description_df <- unique(reactome_df[, c("gs_name", "gs_description"), drop = FALSE])
     descriptions <- stats::setNames(description_df$gs_description, description_df$gs_name)
-    species_tag <- gsub(" ", "_", tolower(species))
+    species_tag <- species_slug(species)
     filepath <- file.path(output_dir, sprintf("reactome_msigdb_%s.gmt", species_tag))
   } else if (method == "reactome.db") {
     if (!requireNamespace("reactome.db", quietly = TRUE)) {
@@ -248,7 +249,7 @@ download_reactome_gmt <- function(
 
     gene_sets <- lapply(split(pathway_genes$ENTREZID, pathway_genes$PATHID), unique)
     descriptions <- stats::setNames(pathway_names_df$PATHNAME, pathway_names_df$PATHID)
-    species_tag <- gsub(" ", "_", tolower(species))
+    species_tag <- species_slug(species)
     filepath <- file.path(output_dir, sprintf("reactome_%s.gmt", species_tag))
   } else {
     stop("method must be one of: 'reactome.db', 'msigdbr'", call. = FALSE)
@@ -333,14 +334,15 @@ download_progeny_gmt <- function(
     sub("_UP$", " upregulated genes", sub("_DN$", " downregulated genes", names(signed_sets))),
     names(signed_sets)
   )
-  signed_file <- file.path(output_dir, sprintf("progeny_signed_%s_top%d.gmt", organism, top_n))
+  species_tag <- species_slug_from_orgdb_or_key(org_db, organism)
+  signed_file <- file.path(output_dir, sprintf("progeny_%s_signed_top%d.gmt", species_tag, top_n))
   write_gmt_from_list(signed_sets, signed_descriptions, signed_file)
 
   unsigned_descriptions <- stats::setNames(
     paste(names(unsigned_sets), "regulated genes"),
     names(unsigned_sets)
   )
-  unsigned_file <- file.path(output_dir, sprintf("progeny_unsigned_%s_top%d.gmt", organism, top_n))
+  unsigned_file <- file.path(output_dir, sprintf("progeny_%s_unsigned_top%d.gmt", species_tag, top_n))
   write_gmt_from_list(unsigned_sets, unsigned_descriptions, unsigned_file)
 
   message(sprintf(
@@ -593,7 +595,8 @@ download_collectri_gmt <- function(
     }
   }
 
-  signed_file <- file.path(output_dir, sprintf("collectri_signed_%s.gmt", organism))
+  species_tag <- species_slug_from_orgdb_or_key(org_db, organism)
+  signed_file <- file.path(output_dir, sprintf("collectri_%s_signed.gmt", species_tag))
   if (length(signed_sets)) {
     write_gmt_from_list(signed_sets, signed_descriptions, signed_file)
   } else {
@@ -601,7 +604,7 @@ download_collectri_gmt <- function(
     message(sprintf("Wrote 0 gene sets to %s (no TFs passed the target-size filter)", signed_file))
   }
 
-  unsigned_file <- file.path(output_dir, sprintf("collectri_unsigned_%s.gmt", organism))
+  unsigned_file <- file.path(output_dir, sprintf("collectri_%s_unsigned.gmt", species_tag))
   if (length(unsigned_sets)) {
     write_gmt_from_list(unsigned_sets, unsigned_descriptions, unsigned_file)
   } else {

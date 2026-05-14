@@ -9,9 +9,10 @@ libraries suitable for \code{run_ora()} and \code{run_gsea()}.
 load_pathway_libraries(pathway_dir = "pathway_library")
 }
 \arguments{
-  \item{pathway_dir}{Directory containing GMT files. Files whose names contain
-  \code{"_signed"} are treated as signed libraries; the rest are treated as
-  unsigned libraries.}
+  \item{pathway_dir}{Directory containing GMT files. Files with an explicit
+  \code{signed} filename token are treated as signed libraries. Files with an
+  explicit \code{unsigned} token, plus neutral files without either token, are
+  treated as unsigned libraries.}
 }
 \value{
 A list with \code{signed} and \code{unsigned} elements. Each element is a list
