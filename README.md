@@ -182,7 +182,8 @@ gsea_result <- run_gsea(
   signed_rank = signed_rank,
   org_db = org.Hs.eg.db,
   signed_library = libs$signed,
-  unsigned_library = libs$unsigned
+  unsigned_library = libs$unsigned,
+  rank_mode = c("signed", "unsigned_magnitude")
 )
 ```
 
@@ -315,7 +316,7 @@ Arguments:
 - `pvalueCutoff`, `qvalueCutoff`, `pAdjustMethod`, `minGSSize`, `maxGSSize`: parameters forwarded to the enrichment workflow.
 
 Returns:
-- A combined ORA result data frame, or `NULL` if no enrichment results are returned.
+- A combined ORA result data frame, or `NULL` if no enrichment results are returned. Results include `Library_Type` (`signed` or `unsigned`) and `Direction` (`up`, `down`, or `unsigned`) columns.
 
 ### `run_gsea()`
 
@@ -327,9 +328,10 @@ Arguments:
 - `org_db`: `OrgDb` object used to make results readable.
 - `signed_library`, `unsigned_library`: outputs from `load_pathway_libraries()`.
 - `pvalueCutoff`, `pAdjustMethod`, `minGSSize`, `maxGSSize`, `nPermSimple`: parameters forwarded to the GSEA workflow.
+- `rank_mode`: rank modes used for unsigned libraries. Use `"signed"` for conventional signed-statistic GSEA, `"unsigned_magnitude"` for absolute-statistic perturbation GSEA, or both. Signed libraries always use `"signed"`.
 
 Returns:
-- A combined GSEA result data frame, or `NULL` if no enrichment results are returned.
+- A combined GSEA result data frame, or `NULL` if no enrichment results are returned. Results include `Library_Type` (`signed` or `unsigned`) and `Rank_Mode` (`signed` or `unsigned_magnitude`) columns.
 
 ### `read_gmt_term2name()`
 
@@ -349,9 +351,10 @@ Returns:
 - In `run_ora()`, `signed_rank` invokes ranked-selection mode, so the ORA input list is selected by `gene_fraction` from the full ranked vector.
 - In `run_ora()`, `selected_genes` invokes explicit-hit mode, so the ORA input list is the supplied foreground and `universe` defines the background.
 - In explicit-hit mode, the numeric values in `selected_genes` are only used to split signed libraries into `up` and `down`; unsigned libraries only use gene membership.
-- In `run_gsea()`, signed libraries use the signed statistic, while unsigned libraries use the absolute statistic.
+- In `run_gsea()`, signed libraries always use the signed statistic.
+- In `run_gsea()`, unsigned libraries use the rank modes requested by `rank_mode`: signed statistics for conventional directional GSEA and/or absolute statistics for perturbation-magnitude GSEA.
 
-That distinction is important: unsigned enrichments should be interpreted as strong perturbation, not necessarily upregulation.
+That distinction is important: unsigned-library results with `Rank_Mode = "unsigned_magnitude"` should be interpreted as strong perturbation, not necessarily upregulation.
 
 ## Dependencies
 

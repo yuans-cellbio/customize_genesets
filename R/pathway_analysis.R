@@ -143,7 +143,26 @@ prepare_gsea_rankings <- function(signed_rank) {
   )
 }
 
-format_enrichment_result <- function(result, org_db, direction, library_name) {
+resolve_gsea_rank_modes <- function(rank_mode) {
+  match.arg(rank_mode, choices = c("signed", "unsigned_magnitude"), several.ok = TRUE)
+}
+
+gsea_score_type <- function(rank_mode) {
+  switch(
+    rank_mode,
+    signed = "std",
+    unsigned_magnitude = "pos"
+  )
+}
+
+format_enrichment_result <- function(
+    result,
+    org_db,
+    library_name,
+    library_type,
+    direction = NULL,
+    rank_mode = NULL
+) {
   if (is.null(result)) {
     return(NULL)
   }
@@ -162,9 +181,19 @@ format_enrichment_result <- function(result, org_db, direction, library_name) {
     return(NULL)
   }
 
-  result_df$Direction <- direction
   result_df$Library <- library_name
-  result_df[, c("Library", "Direction", setdiff(names(result_df), c("Library", "Direction"))), drop = FALSE]
+  result_df$Library_Type <- library_type
+  metadata_cols <- c("Library", "Library_Type")
+  if (!is.null(direction)) {
+    result_df$Direction <- direction
+    metadata_cols <- c(metadata_cols, "Direction")
+  }
+  if (!is.null(rank_mode)) {
+    result_df$Rank_Mode <- rank_mode
+    metadata_cols <- c(metadata_cols, "Rank_Mode")
+  }
+
+  result_df[, c(metadata_cols, setdiff(names(result_df), metadata_cols)), drop = FALSE]
 }
 
 adjust_enrichment_results <- function(result_df, p_adjust_method = "BH") {
@@ -172,7 +201,8 @@ adjust_enrichment_results <- function(result_df, p_adjust_method = "BH") {
     return(result_df)
   }
 
-  group_key <- interaction(result_df$Library, result_df$Direction, drop = TRUE)
+  group_cols <- intersect(c("Library", "Library_Type", "Direction", "Rank_Mode"), names(result_df))
+  group_key <- interaction(result_df[group_cols], drop = TRUE)
   result_df$p.adjust <- stats::ave(
     result_df$pvalue,
     group_key,
@@ -211,7 +241,7 @@ run_ora <- function(
   selected <- ora_input$selected
   universe <- ora_input$universe
 
-  run_single_ora <- function(library_entry, gene_ids, direction_label) {
+  run_single_ora <- function(library_entry, gene_ids, library_type, direction_label) {
     if (!length(gene_ids)) {
       return(NULL)
     }
@@ -231,19 +261,33 @@ run_ora <- function(
     format_enrichment_result(
       result,
       org_db = org_db,
-      direction = direction_label,
-      library_name = library_entry$lib_name
+      library_name = library_entry$lib_name,
+      library_type = library_type,
+      direction = direction_label
     )
   }
 
   signed_results <- c(
-    lapply(signed_library, run_single_ora, gene_ids = selected$up, direction_label = "up"),
-    lapply(signed_library, run_single_ora, gene_ids = selected$down, direction_label = "down")
+    lapply(
+      signed_library,
+      run_single_ora,
+      gene_ids = selected$up,
+      library_type = "signed",
+      direction_label = "up"
+    ),
+    lapply(
+      signed_library,
+      run_single_ora,
+      gene_ids = selected$down,
+      library_type = "signed",
+      direction_label = "down"
+    )
   )
   unsigned_results <- lapply(
     unsigned_library,
     run_single_ora,
     gene_ids = selected$selected,
+    library_type = "unsigned",
     direction_label = "unsigned"
   )
 
@@ -260,7 +304,8 @@ run_gsea <- function(
     pAdjustMethod = "BH",
     minGSSize = 15,
     maxGSSize = 500,
-    nPermSimple = 10000
+    nPermSimple = 10000,
+    rank_mode = c("signed", "unsigned_magnitude")
 ) {
   if (!requireNamespace("clusterProfiler", quietly = TRUE)) {
     stop("Install clusterProfiler to run GSEA", call. = FALSE)
@@ -270,10 +315,11 @@ run_gsea <- function(
   }
 
   rankings <- prepare_gsea_rankings(signed_rank)
+  rank_mode <- resolve_gsea_rank_modes(rank_mode)
 
-  run_single_gsea <- function(library_entry, gene_list, direction_label, score_type) {
+  run_single_gsea <- function(library_entry, library_type, rank_mode) {
     result <- clusterProfiler::GSEA(
-      geneList = gene_list,
+      geneList = rankings[[rank_mode]],
       TERM2GENE = library_entry$term2gene,
       TERM2NAME = library_entry$term2name,
       pvalueCutoff = pvalueCutoff,
@@ -282,31 +328,38 @@ run_gsea <- function(
       maxGSSize = maxGSSize,
       eps = 0,
       nPermSimple = nPermSimple,
-      scoreType = score_type,
+      scoreType = gsea_score_type(rank_mode),
       seed = TRUE
     )
 
     format_enrichment_result(
       result,
       org_db = org_db,
-      direction = direction_label,
-      library_name = library_entry$lib_name
+      library_name = library_entry$lib_name,
+      library_type = library_type,
+      rank_mode = rank_mode
     )
   }
 
   signed_results <- lapply(
     signed_library,
     run_single_gsea,
-    gene_list = rankings$signed,
-    direction_label = "signed",
-    score_type = "std"
+    library_type = "signed",
+    rank_mode = "signed"
   )
-  unsigned_results <- lapply(
-    unsigned_library,
-    run_single_gsea,
-    gene_list = rankings$unsigned_magnitude,
-    direction_label = "unsigned_magnitude",
-    score_type = "pos"
+  unsigned_results <- unlist(
+    lapply(
+      rank_mode,
+      function(current_rank_mode) {
+        lapply(
+          unsigned_library,
+          run_single_gsea,
+          library_type = "unsigned",
+          rank_mode = current_rank_mode
+        )
+      }
+    ),
+    recursive = FALSE
   )
 
   combined <- dplyr::bind_rows(c(signed_results, unsigned_results))

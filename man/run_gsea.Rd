@@ -15,7 +15,8 @@ run_gsea(
     pAdjustMethod = "BH",
     minGSSize = 15,
     maxGSSize = 500,
-    nPermSimple = 10000
+    nPermSimple = 10000,
+    rank_mode = c("signed", "unsigned_magnitude")
 )
 }
 \arguments{
@@ -35,12 +36,17 @@ run_gsea(
   \item{maxGSSize}{Maximum gene-set size passed to \code{clusterProfiler::GSEA()}.}
   \item{nPermSimple}{Number of simple permutations passed to
   \code{clusterProfiler::GSEA()}.}
+  \item{rank_mode}{Character vector of rank modes used for unsigned
+  libraries. Use \code{"signed"} for conventional signed-statistic GSEA,
+  \code{"unsigned_magnitude"} for absolute-statistic perturbation GSEA, or
+  both. Signed libraries always use \code{"signed"}.}
 }
 \value{
 A data frame of combined GSEA results, or \code{NULL} when no enrichments are
-returned.
+returned. Results include \code{Library_Type} and \code{Rank_Mode} columns.
 }
 \details{
-Signed libraries use the signed statistic, while unsigned libraries use the
-absolute statistic and a positive-only score type.
+Signed libraries use the signed statistic. Unsigned libraries use the rank modes
+requested by \code{rank_mode}: signed statistics with the standard score type
+and/or absolute statistics with a positive-only score type.
 }

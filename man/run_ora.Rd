@@ -54,7 +54,7 @@ run_ora(
 }
 \value{
 A data frame of combined ORA results, or \code{NULL} when no enrichments are
-returned.
+returned. Results include \code{Library_Type} and \code{Direction} columns.
 }
 \details{
 In ranked-selection mode, signed libraries are tested separately against the up-

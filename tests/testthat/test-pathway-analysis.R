@@ -86,3 +86,27 @@ test_that("GSEA rankings keep sign for signed sets and magnitude for unsigned se
   expect_equal(names(rankings$unsigned_magnitude), c("B", "A", "C"))
   expect_equal(unname(rankings$unsigned_magnitude), c(5, 2, 1))
 })
+
+test_that("GSEA rank mode validation supports one or both unsigned modes", {
+  expect_equal(resolve_gsea_rank_modes("signed"), "signed")
+  expect_equal(
+    resolve_gsea_rank_modes(c("signed", "unsigned_magnitude")),
+    c("signed", "unsigned_magnitude")
+  )
+  expect_equal(gsea_score_type("signed"), "std")
+  expect_equal(gsea_score_type("unsigned_magnitude"), "pos")
+  expect_error(resolve_gsea_rank_modes("magnitude"), "'arg' should be one of")
+})
+
+test_that("enrichment p-value adjustment respects available metadata columns", {
+  result_df <- data.frame(
+    Library = c("lib_a", "lib_a", "lib_a", "lib_a"),
+    Library_Type = c("unsigned", "unsigned", "unsigned", "unsigned"),
+    Rank_Mode = c("signed", "signed", "unsigned_magnitude", "unsigned_magnitude"),
+    pvalue = c(0.01, 0.02, 0.01, 0.5)
+  )
+
+  adjusted <- adjust_enrichment_results(result_df)
+
+  expect_equal(adjusted$p.adjust, c(0.02, 0.02, 0.02, 0.5))
+})
