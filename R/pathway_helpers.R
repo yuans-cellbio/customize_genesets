@@ -44,6 +44,59 @@ organism_slug_from_orgdb <- function(org_db) {
   gsub(" ", "_", tolower(organism_name_from_orgdb(org_db)))
 }
 
+species_slug <- function(species) {
+  gsub("[^a-z0-9]+", "_", tolower(trimws(as.character(species))))
+}
+
+species_slug_from_organism_key <- function(organism) {
+  normalized <- normalize_species_label(organism)
+  species <- switch(
+    normalized,
+    "hsa" = "Homo sapiens",
+    "human" = "Homo sapiens",
+    "mmu" = "Mus musculus",
+    "mouse" = "Mus musculus",
+    "rno" = "Rattus norvegicus",
+    "rat" = "Rattus norvegicus",
+    canonical_species_name(organism)
+  )
+
+  species_slug(species)
+}
+
+species_slug_from_orgdb_or_key <- function(org_db, organism) {
+  org_species <- organism_name_from_orgdb(org_db)
+  if (!identical(org_species, "unknown")) {
+    return(species_slug(org_species))
+  }
+
+  species_slug_from_organism_key(organism)
+}
+
+msigdb_collection_label <- function(collection) {
+  collection <- toupper(trimws(as.character(collection)))
+  collection_labels <- c(
+    H = "hallmark",
+    MH = "hallmark"
+  )
+  if (!(collection %in% names(collection_labels))) {
+    return(tolower(collection))
+  }
+
+  unname(collection_labels[[collection]])
+}
+
+msigdb_file_tag <- function(collection, subcollection = NULL) {
+  collection_tag <- msigdb_collection_label(collection)
+  if (is.null(subcollection)) {
+    return(collection_tag)
+  }
+
+  subcollection_tag <- gsub("[^a-z0-9]+", "_", tolower(trimws(as.character(subcollection))))
+  subcollection_tag <- gsub("^_|_$", "", subcollection_tag)
+  paste(collection_tag, subcollection_tag, sep = "_")
+}
+
 normalize_species_label <- function(species) {
   if (!is.character(species) || length(species) != 1L || is.na(species) || !nzchar(trimws(species))) {
     stop("species must be a single non-empty character string", call. = FALSE)
@@ -298,6 +351,14 @@ read_gmt_term2name <- function(filepath) {
     Name = vapply(parts, `[`, character(1), 2),
     stringsAsFactors = FALSE
   )
+}
+
+is_signed_library_path <- function(filepath) {
+  grepl("(^|_)signed(_|$)", sub("\\.gmt$", "", basename(filepath)))
+}
+
+is_unsigned_library_path <- function(filepath) {
+  grepl("(^|_)unsigned(_|$)", sub("\\.gmt$", "", basename(filepath)))
 }
 
 map_symbols_to_entrez <- function(
